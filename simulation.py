@@ -2,6 +2,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.animation import FuncAnimation
 import csv
+import brain
+import importlib
+importlib.reload(brain)
 
 class Bear:
     def __init__(self, x, y):
@@ -56,11 +59,12 @@ def find_nearest_dot(bear, dots):
     min_distance = float('inf')
     for dot in dots:
         distance = bear.distance_to(dot)
-        if distance < min_distance: #and dot.food_type=='food':
+        if distance < min_distance and not dot.is_tested:
             min_distance = distance
             nearest_dot = dot
-    return nearest_dot
-
+        
+    prediction=brain.knn(nearest_dot)
+    return nearest_dot,prediction
 # Initialize the plot
 sns.set_theme(style="whitegrid")
 fig, ax = plt.subplots(figsize=(8, 8))
@@ -78,30 +82,36 @@ def update(frame):
 
     if not random_dots:
         return bear_plot, random_dots_plot
-
     # Find the nearest dot
-    nearest_dot = find_nearest_dot(bear, random_dots)
-
+    nearest_dot, prediction = find_nearest_dot(bear, random_dots)
     # Move the main dot towards the nearest dot
     bear.move_towards(nearest_dot, step_size=1)
-
     # If the main dot is close enough to the nearest dot, "consume" it
     if bear.distance_to(nearest_dot) < 2 :
-        bear.size += 5  # Increase the size of the main dot
-        random_dots.remove(nearest_dot)
-  
+        nearest_dot.is_tested=True
+        if prediction=='food' :
+            if nearest_dot.food_type=='food':
+                bear.size += 20  # Increase the size of the main dot
+                random_dots.remove(nearest_dot)
+            else:
+                bear.size = 5
+                random_dots.remove(nearest_dot)
+        elif prediction=='poison':
+            nearest_dot.is_tested=True
+            #random_dots.remove(nearest_dot)
+        
 
     # Update the plots
     bear_plot.set_offsets([[bear.x, bear.y]])
     bear_plot.set_sizes([bear.size])
     random_dots_plot.set_offsets([[dot.x, dot.y] for dot in random_dots])
     random_dots_plot.set_sizes([dot.size for dot in random_dots])
-    random_dots_plot.set_facecolor([dot.color for dot in random_dots])
+    random_dots_plot.set_facecolor(['orange' if dot.is_tested and dot.food_type=='food' else dot.color for dot in random_dots])
 
     return bear_plot, random_dots_plot
 
 # Create the animation
-ani = FuncAnimation(fig, update, frames=500, interval=50, blit=True)
+ani = FuncAnimation(fig, update, frames=10000, interval=10, blit=True)
 
 # Show the animation
 plt.show()
